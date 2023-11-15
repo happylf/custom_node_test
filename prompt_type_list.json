@@ -1,0 +1,18 @@
+[
+        {
+            "TYPE": "BATTLE",
+            "PROMPT": "soldier, gun, flame, smoke, destroyed,"
+        },
+        {
+            "TYPE": "CYBORG",
+            "PROMPT": "cyborg, power armor, spine, mechanisms,"
+        },
+        {
+            "TYPE": "METROPOLIS",
+            "PROMPT": "city, skyscrapers,"
+        },
+        {
+            "TYPE": "SORROW",
+            "PROMPT": "sorrow, rain, tears,"
+        }
+]
