@@ -1,6 +1,8 @@
-import os       #N02-04 for reading jason file
+import os       
 import json
 
+import comfy.utils
+import folder_paths
 
 class cl_TestNode01:
     @classmethod
@@ -78,7 +80,6 @@ class cl_TestNode03:
                 break
  
         tokens = clip.tokenize(output_text)
-                
         cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
 
         print(f"prompt={output_text}")
@@ -86,3 +87,44 @@ class cl_TestNode03:
         print(f"encode={cond}")
               
         return ([[cond, {"pooled_output": pooled}]], )
+
+class cl_TestNode04:        
+    def __init__(self):    
+        pass
+    
+    @classmethod
+    def INPUT_TYPES(self):  
+        file_path = os.path.dirname(os.path.realpath(__file__))     
+        self.prompt_type_list, type_list = read_prompt_type_list(file_path)  
+        
+        return {"required": {"ckpt_name": (folder_paths.get_filename_list("checkpoints"), ),
+                             "input_positive": ("STRING", {"default": "", "multiline": True}),
+                             "input_negative": ("STRING", {"default": "", "multiline": True}),
+                             "select_type": (type_list, {"default": "BATTLE"})  
+                            }}
+
+    RETURN_TYPES = ("MODEL", "VAE", "CONDITIONING", "CONDITIONING",)
+    RETURN_NAMES = ("MODEL", "VAE", "positive", "negative",)    
+    FUNCTION = "test04"
+    CATEGORY = "TestNode"
+
+    def test04(self, ckpt_name, input_positive, input_negative, select_type): 
+        for item in self.prompt_type_list:
+            if item['TYPE'] == select_type:
+                output_positive = input_positive + item['PROMPT'] 
+                break
+        output_positive = "masterpiece, best quality, high resolution," + output_positive
+
+        ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
+        out = comfy.sd.load_checkpoint_guess_config(ckpt_path, output_vae=True, 
+                output_clip=True, embedding_directory=folder_paths.get_folder_paths("embeddings"))
+
+        clip = out[1]  
+        tokens = clip.tokenize(output_positive)
+        positive_cond, positive_pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+
+        tokens = clip.tokenize(input_negative)
+        negative_cond, negative_pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+
+        return (out[0], out[2], [[positive_cond, {"pooled_output": positive_pooled}]], 
+                [[negative_cond, {"pooled_output": negative_pooled}]], )
