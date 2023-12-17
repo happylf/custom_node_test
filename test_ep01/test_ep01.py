@@ -38,6 +38,12 @@ Impact_path = os.path.join(custom_nodes_path, "ComfyUI-Impact-Pack\modules\impac
 sys.path.append(Impact_path)
 import impact_pack as Impact
 
+import comfy_extras.nodes_mask as nodes_mask
+
+# Inspire-Pack for Regional Color Mask
+Inspire_path = os.path.join(custom_nodes_path, "ComfyUI-Inspire-Pack")
+sys.path.append(Inspire_path)
+import inspire.regional_nodes as Regional
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "models")
 
@@ -571,3 +577,219 @@ class FaceEnhance:
                 negative, denoise, feather, noise_mask, force_inpaint, wildcard, detailer_hook)
       
         return (enhanced_img,)
+    
+class Yolo_Detector:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { "image_list": ("IMAGE", ),
+                              "threshold": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
+                              "labels": ("STRING", {"multiline": True, "default": "all", 
+                              "placeholder": "List the types of segments to be allowed, separated by commas"}),                            
+                              }}
+
+    RETURN_TYPES = ("MASK", "MASK", "IMAGE")
+    RETURN_NAMES = ("person_masks", "others_masks", "mask_color_image")
+    FUNCTION = "todo"
+    CATEGORY = "TestEp01/Detector"
+
+    def todo(self, image_list, threshold, labels):
+        # from UltralyticsDetectorProvider
+        model_name = "segm/yolov8m-seg.pt"
+        model_path = folder_paths.get_full_path("ultralytics", model_name)
+        model = subcore.load_yolo(model_path)
+        segm_detector = subcore.UltraSegmDetector(model)
+
+        dilation = 10
+        crop_factor = 3.0
+        drop_size = 10
+        detailer_hook = None       
+
+        person_masks_list = []
+        others_masks_list = []
+        mask_color_image_list = []
+
+        for image in image_list:
+            image = image.unsqueeze(0)
+            segs = segm_detector.detect(image, threshold, dilation, crop_factor, drop_size, detailer_hook)
+
+            # SEGSLabelFilter
+            person_segs = []
+            others_segs = []
+
+            for x in segs[1]:
+                if x.label == 'person':
+                    person_segs.append(x)
+                else:    
+                    others_segs.append(x)
+
+            person_masks = core.segs_to_combined_mask((segs[0], person_segs))
+            others_masks = core.segs_to_combined_mask((segs[0], others_segs))
+
+            person_masks_list.append(person_masks)            
+            others_masks_list.append(others_masks)            
+
+            height = segs[0][0]
+            width = segs[0][1]
+            x = y = 0
+            resize_source = False
+            d = nodes.EmptyImage().generate(width, height, batch_size=1, color=255)[0]      #blue
+            s = nodes.EmptyImage().generate(width, height, batch_size=1, color=16711680)[0] #red - person
+            temp_image = nodes_mask.ImageCompositeMasked().composite(d, s, x, y, 
+                                      resize_source, person_masks)[0]
+            s = nodes.EmptyImage().generate(width, height, batch_size=1, color=65280)[0]    #green - others
+            mask_color_image = nodes_mask.ImageCompositeMasked().composite(temp_image, s, x, y, 
+                                      resize_source, others_masks)[0]
+                 
+            mask_color_image_list.append(mask_color_image)
+        
+        output_person_masks = torch.cat(person_masks_list, 0)
+        output_others_masks = torch.cat(others_masks_list, 0) 
+        output_mask_color_image = torch.cat(mask_color_image_list, 0)
+
+        return (output_person_masks, output_others_masks, output_mask_color_image)
+    
+class PreSampler_IPAdapter:
+    @classmethod
+    def INPUT_TYPES(s):  
+        return {"required": {"ckpt_name": (folder_paths.get_filename_list("checkpoints"), ),
+                             "input_positive": ("STRING", {"default": "", "multiline": True}),
+                             "input_negative": ("STRING", {"default": "", "multiline": True}),
+                             "width": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                             "height": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                             "batch_size": ("INT", {"default": 1, "min": 1, "max": 4096}),
+                             "load_image": ("IMAGE",),
+                             "threshold": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01}),
+                             "background_image": ("IMAGE", ),
+                             "person_image": ("IMAGE", ),
+                             "others_image": ("IMAGE", ),
+                            }}
+
+    RETURN_TYPES=("PRESET01", "IMAGE")
+    RETURN_NAMES=("preset_sampler", "color_mask_list")    
+
+    FUNCTION = "todo"
+    CATEGORY = "TestEp01"
+
+    def todo(self, ckpt_name, input_positive, input_negative, width, height, batch_size, load_image, threshold,
+             background_image, person_image, others_image): 
+
+        # checkpoint model
+        ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
+        out = comfy.sd.load_checkpoint_guess_config(ckpt_path, output_vae=True, 
+                output_clip=True, embedding_directory=folder_paths.get_folder_paths("embeddings"))
+ 
+        ckpt_model = out[0]
+        ckpt_clip = out[1] 
+        vae = out[2]
+
+        # prompt encoding
+        output_positive = "masterpiece, best quality, high resolution," + input_positive
+        tokens = ckpt_clip.tokenize(output_positive)
+        ckpt_positive_cond, ckpt_positive_pooled = ckpt_clip.encode_from_tokens(
+                                 tokens, return_pooled=True)
+        tokens = ckpt_clip.tokenize(input_negative)
+        ckpt_negative_cond, ckpt_negative_pooled = ckpt_clip.encode_from_tokens(tokens, return_pooled=True)
+        latent_image = torch.zeros([batch_size, 4, height // 8, width // 8])
+        
+        upscale_method = "nearest-exact"
+        crop = "disabled"
+        load_image = nodes.ImageScale().upscale(load_image, upscale_method, width, height, crop)[0]
+
+        # Load ControlNet Model (Advanced)
+        control_net_name = "control_v11p_sd15_lineart_fp16.safetensors"
+        timestep_keyframe = None
+        control_net = control_nodes.ControlNetLoaderAdvanced().load_controlnet( 
+                         control_net_name, timestep_keyframe)[0]
+        
+        # Apply ControlNet
+        strength = 1.0
+        start_percent = 0.0
+        end_percent = 1.0
+        mask_optional = None
+
+        controlnet_positive_list = []
+        controlnet_negative_list = []
+        for image in load_image:
+            image = image.unsqueeze(0)
+            controlnet_positive, controlnet_negative = control_nodes.AdvancedControlNetApply().apply_controlnet(
+                                [[ckpt_positive_cond, {"pooled_output": ckpt_positive_pooled}]], 
+                                [[ckpt_negative_cond, {"pooled_output": ckpt_negative_pooled}]], 
+                                control_net, image, strength, start_percent, end_percent, mask_optional)
+            controlnet_positive_list.append(controlnet_positive) 
+            controlnet_negative_list.append(controlnet_negative)
+
+        # Yolo_Detector (color mask)
+        labels = 'all'
+        _, _, color_mask_list = Yolo_Detector().todo(load_image, threshold, labels)
+
+        output_model = []
+
+        for color_mask in color_mask_list:
+            color_mask = color_mask.unsqueeze(0)    
+
+            # IPAdapterToModel
+            weight = 0.7
+            noise = 0.5
+            weight_type = "original"
+            mask_color = "#0000FF"
+            cond_b, _ = Regional.RegionalIPAdapterColorMask().doit(color_mask, mask_color, 
+                                            background_image, weight, noise, weight_type)
+            mask_color = "#FF0000"
+            cond_p, _ = Regional.RegionalIPAdapterColorMask().doit(color_mask, mask_color, 
+                                            person_image, weight, noise, weight_type)
+            mask_color = "#00FF00"
+            cond_o, _ = Regional.RegionalIPAdapterColorMask().doit(color_mask, mask_color, 
+                                            others_image, weight, noise, weight_type)
+
+            # Apply IPAdapter
+            # IPAdapterModelLoader
+            ipadapter_file = 'ip-adapter-plus_sd15.bin'
+            ipadapter = IPAdapter.IPAdapterModelLoader().load_ipadapter_model(ipadapter_file)[0]
+
+            # CLIPVisionLoader
+            clip_name = 'sd1.5 model.safetensors'
+            clip_vision = nodes.CLIPVisionLoader().load_clip(clip_name)[0]
+
+            # ToIPAdapterPipe:
+            pipe = Regional.ToIPAdapterPipe().doit(ipadapter, clip_vision, ckpt_model)[0]
+
+            # ApplyRegionalIPAdapters
+            kwargs = ({'ipadapter_pipe': pipe, 'regional_ipadapter1': cond_b, 'regional_ipadapter2': cond_p, 
+                    'regional_ipadapter3': cond_o})
+            
+            output_model.append(Regional.ApplyRegionalIPAdapters().doit(**kwargs)[0])
+      
+        preset_sampler = (output_model, vae, controlnet_positive_list, controlnet_negative_list, {"samples":latent_image},)
+
+        return(preset_sampler, color_mask_list)
+    
+class Sampler_IPAdapter:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { "preset_for_sampler": ("PRESET01",),   
+                              "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+                              "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
+                              "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, 
+                                                "step":0.1, "round": 0.01}),
+                              "sampler_name": (comfy.samplers.KSampler.SAMPLERS, ),
+                              "scheduler": (comfy.samplers.KSampler.SCHEDULERS, ),
+                              "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),                                                      
+                              }}
+
+    RETURN_TYPES = ("IMAGE", )
+    FUNCTION = "todo"
+    CATEGORY = "TestEp01/Sampler"
+
+    def todo(self, preset_for_sampler, seed, steps, cfg, sampler_name, scheduler, denoise=1.0):  
+        model_list, vae, positive_list, negative_list, latent_image = preset_for_sampler
+        samples_list = []
+        
+        i = 0
+        for model in model_list:
+            samples = nodes.common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, 
+                           positive_list[i], negative_list[i], latent_image, denoise=denoise)           
+            samples_list.append(vae.decode(samples[0]["samples"]))
+            i = i + 1
+ 
+        output_image = torch.cat(samples_list, 0)
+        return (output_image,)    

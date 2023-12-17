@@ -9,7 +9,11 @@ NODE_CLASS_MAPPINGS = {
     "GptPrompt":            GptPrompt,
     "PreSampler_GPT":       PreSampler_GPT,
     "Sampler_GPT":          Sampler_GPT,
-    "FaceEnhance":          FaceEnhance
+    "FaceEnhance":          FaceEnhance,
+    "Yolo_Detector":        Yolo_Detector,
+    "PreSampler_IPAdapter": PreSampler_IPAdapter,
+    "Sampler_IPAdapter":    Sampler_IPAdapter    
+
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -21,6 +25,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "GptPrompt":            "GptPrompt",
     "PreSampler_GPT":       "PreSampler_GPT",
     "Sampler_GPT":          "Sampler_GPT",
-    "FaceEnhance":          "FaceEnhance"
+    "FaceEnhance":          "FaceEnhance",
+    "Yolo_Detector":        "Yolo_Detector",
+    "PreSampler_IPAdapter": "PreSampler_IPAdapter",
+    "Sampler_IPAdapter":    "Sampler_IPAdapter"    
 }
 
