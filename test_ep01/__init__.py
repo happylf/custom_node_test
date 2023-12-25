@@ -12,8 +12,9 @@ NODE_CLASS_MAPPINGS = {
     "FaceEnhance":          FaceEnhance,
     "Yolo_Detector":        Yolo_Detector,
     "PreSampler_IPAdapter": PreSampler_IPAdapter,
-    "Sampler_IPAdapter":    Sampler_IPAdapter    
-
+    "Sampler_IPAdapter":    Sampler_IPAdapter,
+    "Pre_PromptSchedule":   Pre_PromptSchedule,
+    "Sampler_lcm":          Sampler_lcm    
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -28,6 +29,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "FaceEnhance":          "FaceEnhance",
     "Yolo_Detector":        "Yolo_Detector",
     "PreSampler_IPAdapter": "PreSampler_IPAdapter",
-    "Sampler_IPAdapter":    "Sampler_IPAdapter"    
+    "Sampler_IPAdapter":    "Sampler_IPAdapter",
+    "Pre_PromptSchedule":   "Pre_PromptSchedule",
+    "Sampler_lcm":          "Sampler_lcm"    
 }
 

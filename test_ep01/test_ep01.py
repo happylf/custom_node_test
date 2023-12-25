@@ -1,4 +1,5 @@
 import torch
+from GPUtil import showUtilization as gpu_usage
 
 import json
 
@@ -39,6 +40,8 @@ sys.path.append(Impact_path)
 import impact_pack as Impact
 
 import comfy_extras.nodes_mask as nodes_mask
+# LCM lora
+import comfy_extras.nodes_model_advanced as nodes_model
 
 # Inspire-Pack for Regional Color Mask
 Inspire_path = os.path.join(custom_nodes_path, "ComfyUI-Inspire-Pack")
@@ -792,4 +795,179 @@ class Sampler_IPAdapter:
             i = i + 1
  
         output_image = torch.cat(samples_list, 0)
-        return (output_image,)    
+        return (output_image,)  
+
+class Pre_PromptSchedule:
+    @classmethod
+    def INPUT_TYPES(s):  
+        return {"required": {"ckpt_name": (folder_paths.get_filename_list("checkpoints"), ),
+                             "positive_common": ("STRING", {"default": "", "multiline": True}),                            
+                             "positive_1st": ("STRING", {"default": "", "multiline": True}),
+                             "image_1st": ("IMAGE",),
+                             "positive_2nd": ("STRING", {"default": "", "multiline": True}),
+                             "image_2nd": ("IMAGE",),
+                             "positive_3rd": ("STRING", {"default": "", "multiline": True}),                             
+                             "image_3rd": ("IMAGE",),
+                             "input_negative": ("STRING", {"default": "", "multiline": True}),
+                             "width": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                             "height": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                             "batch_size": ("INT", {"default": 1, "min": 1, "max": 4096}),                            
+                            }}
+
+    RETURN_TYPES=("PRESET02", "PRESET02", "PRESET02",)
+    RETURN_NAMES=("preset02_1st", "preset02_2nd", "preset02_3rd",)    
+
+    FUNCTION = "todo"
+    CATEGORY = "TestEp01"
+
+    def todo(self, ckpt_name, positive_common, positive_1st, image_1st, positive_2nd, image_2nd, 
+             positive_3rd, image_3rd, input_negative, width, height, batch_size): 
+
+        # checkpoint model
+        ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
+        out = comfy.sd.load_checkpoint_guess_config(ckpt_path, output_vae=True, 
+                output_clip=True, embedding_directory=folder_paths.get_folder_paths("embeddings"))
+ 
+        ckpt_model = out[0]
+        ckpt_clip = out[1] 
+        vae = out[2]
+
+        # CLIPSetLastLayer
+        last_layer_clip = ckpt_clip.clone()
+        last_layer_clip.clip_layer = (-2)
+
+        # positive prompt list
+        positive_list = [positive_1st, positive_2nd, positive_3rd]
+        output_positive_list = []
+        for positive in positive_list:
+            output_positive = "masterpiece, best quality, high resolution," + positive_common + positive
+
+            tokens = last_layer_clip.tokenize(output_positive)
+            output_positive_cond, output_positive_pooled = last_layer_clip.encode_from_tokens(
+                                                        tokens, return_pooled=True)
+            output_positive_list.append([[output_positive_cond, {"pooled_output": output_positive_pooled}]])
+
+        # negative prompt
+        tokens = last_layer_clip.tokenize(input_negative)
+        last_layer_negative_cond, last_layer_negative_pooled = last_layer_clip.encode_from_tokens(
+                                                    tokens, return_pooled=True)
+        output_negative = [[last_layer_negative_cond, {"pooled_output": last_layer_negative_pooled}]]
+
+        # AnimateDiffUniformContextOptions
+        context_length = 16
+        context_stride = 1
+        context_overlap = 4
+        context_schedule = 'uniform'
+        closed_loop = False
+        context_options = AD_nodes.AnimateDiffUniformContextOptions().create_options(context_length,
+                             context_stride, context_overlap, context_schedule, closed_loop)[0]
+
+        # AnimatteDiff Loader
+        model_name = 'mm_sdxl_v10_beta.ckpt'
+        beta_schedule = 'sqrt_linear (AnimateDiff)'
+        motion_lora = None
+        motion_model_settings = None
+        motion_scale = 1
+        apply_v2_models_properly = False
+
+        AD_model = AD_nodes.AnimateDiffLoaderWithContext().load_mm_and_inject_params( 
+                       ckpt_model, model_name, beta_schedule, context_options, motion_lora, 
+                       motion_model_settings, motion_scale, apply_v2_models_properly)[0]
+
+        # make image batch
+        image_count = len(image_1st) + len(image_2nd) + len(image_3rd)
+        quotient, remainder = divmod(batch_size, image_count)
+        quotient = quotient - 1
+        temp_image = image_1st
+        for image in temp_image:
+            image_1st = torch.cat((image_1st, image.repeat((quotient, 1,1,1))), dim=0)
+        temp_image = image_2nd
+        for image in temp_image:
+            image_2nd = torch.cat((image_2nd, image.repeat((quotient, 1,1,1))), dim=0)
+        temp_image = image_3rd
+        for image in temp_image:
+            image_3rd = torch.cat((image_3rd, image.repeat((quotient, 1,1,1))), dim=0)
+        if remainder > 0:
+            image_3rd = torch.cat((image_3rd, image.repeat((remainder, 1,1,1))), dim=0)           
+        image_list = [image_1st, image_2nd, image_3rd]
+
+        # Apply IPAdapter
+        # IPAdapterModelLoader
+        ipadapter_file = 'ip-adapter-plus_sdxl_vit-h.safetensors'
+        ipadapter = IPAdapter.IPAdapterModelLoader().load_ipadapter_model(ipadapter_file)[0]
+
+        # CLIPVisionLoader
+        clip_name = 'sd1.5 model.safetensors'
+        clip_vision = nodes.CLIPVisionLoader().load_clip(clip_name)[0]
+        weight = 0.75
+        weight_type = "linear"
+        noise = 0.33
+        embeds = None
+        attn_mask = None
+        start_at = 0.0
+        end_at = 0.9
+        unfold_batch=False
+
+        model_list = []
+        latent_list = []
+        for image in image_list:
+            # latent image
+            temp_latent = torch.zeros([len(image), 4, height // 8, width // 8])
+            latent_list.append({"samples":temp_latent})
+
+            # IPAdapter_plus PrepImageForClipVision
+            interpolation = "LANCZOS"
+            crop_position = "center"
+            sharpening=0.0         
+            temp_image = IPAdapter.PrepImageForClipVision().prep_image(image, interpolation, 
+                                                            crop_position, sharpening)[0]
+
+            temp_model = IPAdapter.IPAdapterApply().apply_ipadapter(ipadapter, AD_model, weight, 
+                                clip_vision, temp_image, weight_type, noise, embeds, 
+                                attn_mask, start_at, end_at, unfold_batch)[0]
+
+            # lcm lora
+            lcm_path = folder_paths.get_full_path("loras", "lcm\SDXL\pytorch_lora_weights.safetensors")
+            lcm_model = comfy.utils.load_torch_file(lcm_path, safe_load=True)
+            strength_model = 1.0
+            strength_clip = 0.0
+            lcm_model, _ = comfy.sd.load_lora_for_models(temp_model, last_layer_clip, lcm_model, 
+                                                                  strength_model, strength_clip)
+            sampling = "lcm"
+            zsnr = False
+            temp_model = nodes_model.ModelSamplingDiscrete().patch(lcm_model, sampling, zsnr)[0]
+
+            model_list.append(temp_model)            
+
+        preset02_1st = (model_list[0], vae, output_positive_list[0], output_negative, latent_list[0],)
+        preset02_2nd = (model_list[1], vae, output_positive_list[1], output_negative, latent_list[1],)
+        preset02_3rd = (model_list[2], vae, output_positive_list[2], output_negative, latent_list[2],)
+
+        return(preset02_1st, preset02_2nd, preset02_3rd)
+
+class Sampler_lcm:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": { "preset02": ("PRESET02",),   
+                              "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+                              }}
+
+    RETURN_TYPES = ("IMAGE", "LATENT")
+    FUNCTION = "todo"
+    CATEGORY = "TestEp01/Sampler"
+
+    def todo(self, preset02, seed): 
+        torch.cuda.empty_cache()
+        gpu_usage()
+
+        model, vae, positive, negative, latent = preset02
+        steps = 8
+        cfg = 1.5
+        sampler_name = "lcm"
+        scheduler = "normal"
+        denoise = 1.0
+        samples = nodes.common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, 
+                           positive, negative, latent, denoise)  
+                 
+        del preset02 
+        return (vae.decode(samples[0]["samples"]),)          
