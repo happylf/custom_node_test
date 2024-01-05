@@ -87,7 +87,7 @@ class PreSampler:
     RETURN_TYPES=("PRESET01", "FACELORA")
     RETURN_NAMES=("preset_sampler", "preset_face")    
     FUNCTION = "todo"
-    CATEGORY = "TestEp01"
+    CATEGORY = "TestNode/TestEp01"
 
     def todo(self, ckpt_name, input_positive, input_negative, prompt_type,
                lora_name, strength_model, strength_clip, face_positive, width, height, batch_size): 
@@ -167,7 +167,7 @@ class PreSampler_video:
     RETURN_TYPES=("PRESET01", "FACELORA")
     RETURN_NAMES=("preset_sampler", "preset_face")    
     FUNCTION = "todo"
-    CATEGORY = "TestEp01"
+    CATEGORY = "TestNode/TestEp01"
 
     def todo(self, ckpt_name, input_positive, input_negative, prompt_type,
                lora_name, strength_model, strength_clip, face_positive, width, height, batch_size, load_image, ipadapter_image): 
@@ -308,7 +308,7 @@ class PreRegionalSampler:
     RETURN_TYPES = ("LATENT", "KSAMPLER_ADVANCED", "REGIONAL_PROMPTS", "VAE", "IMAGE")
     RETURN_NAMES = ("samples", "base_sampler", "regional_prompts", "vae", "face_mask_image",)
     FUNCTION = "todo"
-    CATEGORY = "TestEp01"
+    CATEGORY = "TestNode/TestEp01"
 
     def todo(self, preset_sampler, preset_face, input_image, cfg, sampler_name, scheduler):
       ckpt_model, vae, positive, negative, samples = preset_sampler
@@ -361,10 +361,10 @@ class FromPresetSampler:
     def INPUT_TYPES(s):
         return {"required": { "preset_sampler": ("PRESET01",),   
                             }}
-    RETURN_TYPES = ("MODEL", "VAE", "CONDITIONING", "CONDITIONING", "IMAGE")
+    RETURN_TYPES = ("MODEL", "VAE", "CONDITIONING", "CONDITIONING", "LATENT")
     RETURN_NAMES = ("model", "vae", "positive", "negative", "samples")
     FUNCTION = "todo"
-    CATEGORY = "TestEp01/etc"
+    CATEGORY = "TestNode/TestEp01/etc"
 
     def todo(self, preset_sampler):
         model, vae, positive, negative, samples = preset_sampler
@@ -377,12 +377,12 @@ class ToPresetSampler:
                              "vae": ("VAE",),
                              "positive": ("CONDITIONING",),
                              "negative": ("CONDITIONING",),
-                             "samples":  ("IMAGE",),
+                             "samples":  ("LATENT",),
                             }}
     RETURN_TYPES = ("PRESET01",)
     RETURN_NAMES = ("preset_sampler",)
     FUNCTION = "todo"
-    CATEGORY = "TestEp01/etc"
+    CATEGORY = "TestNode/TestEp01/etc"
 
     def todo(self, model, vae, positive, negative, samples):
         preset_sampler = (model, vae, positive, negative, samples) 
@@ -399,7 +399,7 @@ class GptPrompt:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("gpt_positive_list",) 
     FUNCTION = "todo"
-    CATEGORY = "TestEp01"
+    CATEGORY = "TestNode/TestEp01"
 
     def todo(self, gpt_model, gpt_question):
         # GPTLoaderSimple
@@ -452,7 +452,7 @@ class PreSampler_GPT:
     RETURN_TYPES=("PRESET01",)
     RETURN_NAMES=("preset_sampler",)    
     FUNCTION = "todo"
-    CATEGORY = "TestEp01"
+    CATEGORY = "TestNode/TestEp01"
 
     def todo(self, ckpt_name, gpt_positive_list, input_positive, input_negative, width, height, batch_size): 
 
@@ -501,7 +501,7 @@ class Sampler_GPT:
 
     RETURN_TYPES = ("IMAGE", )
     FUNCTION = "todo"
-    CATEGORY = "TestEp01/Sampler"
+    CATEGORY = "TestNode/TestEp01/Sampler"
 
     def todo(self, preset_for_sampler, seed, steps, cfg, sampler_name, scheduler, denoise=1.0):  
         model, vae, positive_list, negative, latent_image = preset_for_sampler
@@ -531,7 +531,7 @@ class FaceEnhance:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("enhanced_img",)
     FUNCTION = "todo"
-    CATEGORY = "TestEp01/etc"
+    CATEGORY = "TestNode/TestEp01/etc"
 
     def todo(self, face_detailer, input_image, seed, steps, cfg, sampler_name, scheduler, denoise):
 
@@ -593,9 +593,9 @@ class Yolo_Detector:
     RETURN_TYPES = ("MASK", "MASK", "IMAGE")
     RETURN_NAMES = ("person_masks", "others_masks", "mask_color_image")
     FUNCTION = "todo"
-    CATEGORY = "TestEp01/Detector"
+    CATEGORY = "TestNode/TestEp01/Detector"
 
-    def todo(self, image_list, threshold, labels):
+    def todo(self, image_list, threshold, labels):      
         # from UltralyticsDetectorProvider
         model_name = "segm/yolov8m-seg.pt"
         model_path = folder_paths.get_full_path("ultralytics", model_name)
@@ -606,7 +606,7 @@ class Yolo_Detector:
         crop_factor = 3.0
         drop_size = 10
         detailer_hook = None       
-
+ 
         person_masks_list = []
         others_masks_list = []
         mask_color_image_list = []
@@ -630,7 +630,7 @@ class Yolo_Detector:
 
             person_masks_list.append(person_masks)            
             others_masks_list.append(others_masks)            
-
+ 
             height = segs[0][0]
             width = segs[0][1]
             x = y = 0
@@ -644,9 +644,10 @@ class Yolo_Detector:
                                       resize_source, others_masks)[0]
                  
             mask_color_image_list.append(mask_color_image)
-        
-        output_person_masks = torch.cat(person_masks_list, 0)
-        output_others_masks = torch.cat(others_masks_list, 0) 
+
+        # list to batch masks
+        output_person_masks = torch.stack(person_masks_list, dim=0)               
+        output_others_masks = torch.stack(others_masks_list, dim=0)            
         output_mask_color_image = torch.cat(mask_color_image_list, 0)
 
         return (output_person_masks, output_others_masks, output_mask_color_image)
@@ -671,7 +672,7 @@ class PreSampler_IPAdapter:
     RETURN_NAMES=("preset_sampler", "color_mask_list")    
 
     FUNCTION = "todo"
-    CATEGORY = "TestEp01"
+    CATEGORY = "TestNode/TestEp01"
 
     def todo(self, ckpt_name, input_positive, input_negative, width, height, batch_size, load_image, threshold,
              background_image, person_image, others_image): 
@@ -781,7 +782,7 @@ class Sampler_IPAdapter:
 
     RETURN_TYPES = ("IMAGE", )
     FUNCTION = "todo"
-    CATEGORY = "TestEp01/Sampler"
+    CATEGORY = "TestNode/TestEp01/Sampler"
 
     def todo(self, preset_for_sampler, seed, steps, cfg, sampler_name, scheduler, denoise=1.0):  
         model_list, vae, positive_list, negative_list, latent_image = preset_for_sampler
@@ -818,7 +819,7 @@ class Pre_PromptSchedule:
     RETURN_NAMES=("preset02_1st", "preset02_2nd", "preset02_3rd",)    
 
     FUNCTION = "todo"
-    CATEGORY = "TestEp01"
+    CATEGORY = "TestNode/TestEp01"
 
     def todo(self, ckpt_name, positive_common, positive_1st, image_1st, positive_2nd, image_2nd, 
              positive_3rd, image_3rd, input_negative, width, height, batch_size): 
@@ -954,7 +955,7 @@ class Sampler_lcm:
 
     RETURN_TYPES = ("IMAGE", "LATENT")
     FUNCTION = "todo"
-    CATEGORY = "TestEp01/Sampler"
+    CATEGORY = "TestNode/TestEp01/Sampler"
 
     def todo(self, preset02, seed): 
         torch.cuda.empty_cache()

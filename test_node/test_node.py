@@ -18,7 +18,7 @@ class cl_TestNode01:
 
     RETURN_TYPES = ("STRING", )
     FUNCTION = "test01"
-    CATEGORY = "TestNode"
+    CATEGORY = "TestNode/Begin"
 
     def test01(self, input_text):
       output_text = input_text + ", mountain"
@@ -50,7 +50,7 @@ class cl_TestNode02:        #N02-01 copy from test01, chaange '01' to '02'
 
     RETURN_TYPES = ("STRING", )
     FUNCTION = "test02"
-    CATEGORY = "TestNode"
+    CATEGORY = "TestNode/Begin"
 
     def test02(self, input_text, select_type): #N02-03 add 1 more input
         for item in self.prompt_type_list:
@@ -76,7 +76,7 @@ class cl_TestNode03:
 
     RETURN_TYPES = ("CONDITIONING", )
     FUNCTION = "test03"
-    CATEGORY = "TestNode"
+    CATEGORY = "TestNode/Begin"
 
     def test03(self, clip, input_text, select_type): 
         for item in self.prompt_type_list:
@@ -111,7 +111,7 @@ class cl_TestNode04:
     RETURN_TYPES = ("MODEL", "VAE", "CONDITIONING", "CONDITIONING",)
     RETURN_NAMES = ("MODEL", "VAE", "positive", "negative",)    
     FUNCTION = "test04"
-    CATEGORY = "TestNode"
+    CATEGORY = "TestNode/Begin"
 
     def test04(self, ckpt_name, input_positive, input_negative, select_type): 
         for item in self.prompt_type_list:
@@ -154,7 +154,7 @@ class cl_TestNode05:
     RETURN_TYPES = ("MODEL", "VAE", "CONDITIONING", "CONDITIONING",)
     RETURN_NAMES = ("MODEL", "VAE", "positive", "negative",)    
     FUNCTION = "test05"
-    CATEGORY = "TestNode"
+    CATEGORY = "TestNode/Begin"
 
     def test05(self, ckpt_name, input_positive, input_negative, select_type,
                lora_name, strength_model, strength_clip): 
@@ -210,7 +210,7 @@ class cl_TestNode06:
     RETURN_TYPES = ("PRESET01",)
     RETURN_NAMES = ("preset_for_sampler",)    
     FUNCTION = "test06"
-    CATEGORY = "TestNode"
+    CATEGORY = "TestNode/Begin"
 
     def test06(self, ckpt_name, input_positive, input_negative, select_type,
                lora_name, strength_model, strength_clip, width, height, batch_size=1): 
@@ -259,10 +259,12 @@ class cl_TestSampler01:
 
     RETURN_TYPES = ("IMAGE", )
     FUNCTION = "testsampler01"
-    CATEGORY = "TestNode/Sampler"
+    CATEGORY = "TestNode/Begin"
 
-    def testsampler01(self, preset_for_sampler, seed, steps, cfg, sampler_name, scheduler, denoise=1.0):       
+    def testsampler01(self, preset_for_sampler, seed, steps, cfg, sampler_name, scheduler, denoise=1.0): 
+    
         model, vae, positive, negative, latent_image = preset_for_sampler
+        print(f"positive = {positive}")
         samples = nodes.common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, 
                                         latent_image, denoise=denoise) 
 
