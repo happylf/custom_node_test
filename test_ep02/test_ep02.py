@@ -121,6 +121,29 @@ class Yolo_Detector:
 
         return (person_masks, others_masks, mask_color_img)
 
+class MovingControl:
+    @classmethod
+    def INPUT_TYPES(s):        
+        return {
+            "required": {
+                "moving_set": ("STRING", {"default": "", "multiline": True}),
+                "curr_idx": ("INT", {"default": 0, "min": 0, "max": 10000}),
+                "image_limit": ("INT", {"default": 1, "min": 1, "max": 10000}),                                     
+            }   
+        }
+    RETURN_TYPES=("INT", "INT", "INT")
+    RETURN_NAMES=("x", "y", "r")
+    FUNCTION = "todo"
+    CATEGORY = "TestNode/TestEp02/etc"
+
+    def todo(self, moving_set, curr_idx, image_limit):
+        moving_list = moving_calc(moving_set, image_limit) 
+        x = moving_list[curr_idx][1]
+        y = moving_list[curr_idx][2]
+        r = moving_list[curr_idx][3]
+
+        return x, y, r
+    
 class Edit_pre_sampler:
     @classmethod
     def INPUT_TYPES(s):
@@ -220,4 +243,20 @@ class LoopDecision01:
     
         return (sum_val, send_val, out_img)   
     
+class debug:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": { 
+                "moving_set": ("STRING", {"default": "", "multiline": True}),
+                 "x": ("INT", {"default": 1, "min": 0, "max": 10000}),                 
+            }
+        }
+    RETURN_TYPES = ("STRING", "INT",)
+    RETURN_NAMES = ("moving_set", "x")
+    FUNCTION = "todo"
+    CATEGORY = "TestNode/TestEp02/etc"
 
+    def todo(self, moving_set, x): 
+
+        return moving_set, x

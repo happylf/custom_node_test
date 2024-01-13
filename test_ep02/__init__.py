@@ -8,7 +8,10 @@ NODE_CLASS_MAPPINGS = {
     "Sampler01":                Sampler01,
     "Edit_pre_sampler":         Edit_pre_sampler,
     "CN_IPAd1_Backg":           CN_IPAd1_Backg,
-    "LoopDecision01":           LoopDecision01
+    "LoopDecision01":           LoopDecision01,
+    "MovingControl":            MovingControl,
+    "PersonMoving":             PersonMoving,
+    "debug":                    debug
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -18,6 +21,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Sampler01":                "Sampler01",
     "Edit_pre_sampler":         "Edit_pre_sampler",
     "CN_IPAd1_Backg":           "CN_IPAd1_Backg",
-    "LoopDecision01":           "LoopDecision01"
+    "LoopDecision01":           "LoopDecision01",
+    "MovingControl":            "MovingControl",    
+    "PersonMoving":             "PersonMoving",
+    "debug":                    "debug"
 }
 

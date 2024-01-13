@@ -1,5 +1,6 @@
 import os       
 import sys
+import math
 
 # Reactor
 '''
@@ -40,3 +41,47 @@ def Reactor_apply(image):
             source_image, face_model)
     
     return image
+
+def moving_calc(in_text, batch_size):
+    in_text_list = [list(i.split(':')) for i in in_text.split('>')]
+    mov_list = []
+    for j in in_text_list:
+        moving_list = [list(map(int, k.split(','))) for k in j[1].split('/')]
+        for m in moving_list:
+            if m[0] == 0:
+                b1, x1, y1, r1 = m       
+                continue 
+            b2, x2, y2, r2 = m
+
+            if b1 > batch_size:
+                break
+            if b2 == batch_size:
+                b2 += 1
+            for b in range(b1, b2): 
+                match(j[0]):
+                    case '1':       
+                        x = x1 + int((x2-x1)*math.sqrt(b-b1)/math.sqrt(b2-b1))
+                        y = y1 + int((y2-y1)*math.sqrt(b-b1)/math.sqrt(b2-b1))
+                        r = r1 + int((r2-r1)*math.sqrt(b-b1)/math.sqrt(b2-b1))
+                    case '2':       
+                        x = x1 + int((x2-x1)*math.sqrt(b-b1)/math.sqrt(b2-b1))
+                        y = y1 + int((y2-y1)*abs(math.sin((b-b1)/5)))
+                        r = r1 + int((r2-r1)*math.sqrt(b-b1)/math.sqrt(b2-b1))
+                    case _:
+                        x = x1
+                        y = y1
+                        r = r1         
+
+                if b == batch_size:
+                    x=x2
+                    y=y2
+                    r=r2
+                    mov_list.append([b, x, y, r])              
+                    break
+                mov_list.append([b, x, y, r])  
+            b1 = b2
+            x1 = x2
+            y1 = y2
+            r1 = r2 
+
+    return mov_list 
