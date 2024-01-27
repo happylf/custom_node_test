@@ -13,6 +13,7 @@ import comfy_extras.nodes_mask as nodes_mask
 
 import impact.core as core
 import impact.subcore as subcore
+import impact.segs_nodes as segs_nodes
 from segment_anything import sam_model_registry
 from ultralytics import YOLO
 
@@ -79,22 +80,27 @@ def PromptEncoding(clip, in_posi, in_nega):
 
     return out_posi_cond, out_nega_cond
 
-def IPAd_apply(set_IPAdapter, in_model):
+def IPAd_apply(set_IPAdapter, in_model, attn_mask):
     ipadapter,weight,clip_vision,image,weight_type,noise,start_at,end_at=set_IPAdapter       
-   
+
+    # IPAdapter_plus PrepImageForClipVision
+    interpolation = "LANCZOS"
+    crop_position = "center"
+    sharpening=0.0         
+    t_img = IPAdapter.PrepImageForClipVision().prep_image(image, interpolation, 
+                    crop_position, sharpening)[0]
+  
     # Apply IPAdapter to model
     embeds = None
-    attn_mask = None
     unfold_batch=False
     out_model=IPAdapter.IPAdapterApply().apply_ipadapter(ipadapter,in_model,weight,
-        clip_vision,image,weight_type,noise, embeds,attn_mask,start_at,end_at,unfold_batch)[0]
+        clip_vision,t_img,weight_type,noise, embeds,attn_mask,start_at,end_at,unfold_batch)[0]
 
     return out_model
 
-def cn_apply(in_posi_cond, in_nega_cond, CN_name, CN_img, width, height):
-    CN_img = img_scale_adjust(CN_img, width, height)
-
+def cn_apply(in_posi_cond, in_nega_cond, CN_name, CN_img):
     strength = 1.0
+    
     start_percent = 0.0
     end_percent = 1.0
     '''
@@ -118,7 +124,7 @@ def yolo_detect(image_list, threshold):
         model = subcore.load_yolo(model_path)
         segm_detector = subcore.UltraSegmDetector(model)
 
-        dilation = 10
+        dilation = 0
         crop_factor = 3.0
         drop_size = 10
         detailer_hook = None       
@@ -130,23 +136,31 @@ def yolo_detect(image_list, threshold):
         for image in image_list:
             image = image.unsqueeze(0)
             segs = segm_detector.detect(image, threshold, dilation, crop_factor, drop_size, detailer_hook)
-
             # SEGSLabelFilter
-            person_segs = []
-            others_segs = []
-
+            p_segs = []
+            o_segs = []
             for x in segs[1]:
                 if x.label == 'person':
-                    person_segs.append(x)
+                    p_segs.append(x)
                 else:    
-                    others_segs.append(x)
+                    o_segs.append(x)
+            person_segs = (segs[0], p_segs)
+            others_segs = (segs[0], o_segs)
 
-            person_masks = core.segs_to_combined_mask((segs[0], person_segs))
-            others_masks = core.segs_to_combined_mask((segs[0], others_segs))
+            # SEGSOrderedFilter        
+            target = "area(=w*h)"
+            order = "descending"
+            take_start = 0
+            take_count = 1
+            person_segs = segs_nodes.SEGSOrderedFilter().doit(person_segs, target, order, 
+                        take_start, take_count)[0]
+
+            person_masks = core.segs_to_combined_mask(person_segs)
+            others_masks = core.segs_to_combined_mask(others_segs)
 
             person_masks_list.append(person_masks)            
             others_masks_list.append(others_masks)            
- 
+
             height = segs[0][0]
             width = segs[0][1]
             x = y = 0
@@ -176,7 +190,6 @@ def Sampler(pre_sampler, seed, steps, cfg, sampler_name, scheduler, denoise):
     samples = nodes.KSampler().sample(model, seed, steps, cfg, sampler_name, scheduler, 
                             positive, negative, latent_image, denoise)[0]  
     images = nodes.VAEDecode().decode(vae, samples)[0]
-    images = Reactor_apply(images)
 
     del pre_sampler, model, vae, positive, negative, latent_image
     return images, samples
@@ -194,7 +207,6 @@ def SamplerInsp(pre_sampler, seed, steps, cfg, sampler_name, scheduler, denoise)
         variation_seed=None, variation_strength=None)[0]
     
     images = nodes.VAEDecode().decode(vae, samples)[0]
-    images = Reactor_apply(images)
     
     del pre_sampler, model, vae, positive, negative, latent_image
     return images, samples
@@ -206,15 +218,29 @@ def img_scale_adjust(image, width, height):
 
     return image
 
-def IPAdapter_set(IPAd_img, IPAd_name):
+def IPAdapter_set(IPAd_img, IPAd_name, set_ty):
     IPAd_model = IPAdapter.IPAdapterModelLoader().load_ipadapter_model(IPAd_name)[0]
     clip_name = "sd1.5 model.safetensors"
     clip_vision = nodes.CLIPVisionLoader().load_clip(clip_name)[0]   
-    weight = 1.0
-    weight_type = "original"
-    noise = 0.0
-    start_at = 0.0
-    end_at = 1.0
+    if set_ty == 1:
+        weight = 1.0
+        weight_type = "original"
+        noise = 0.0
+        start_at = 0.0
+        end_at = 1.0
+    else:
+        weight = 0.7
+        weight_type = "original"
+        noise = 0.33
+        start_at = 0.0
+        end_at = 0.7
+
     set_IPAdapter = (IPAd_model, weight, clip_vision, IPAd_img, weight_type, noise, start_at, end_at)
 
     return set_IPAdapter 
+
+def mask_composite(d, s, o):
+    x = 0
+    y = 0
+    out_mask = nodes_mask.MaskComposite().combine(d, s, x, y, o)[0]
+    return out_mask

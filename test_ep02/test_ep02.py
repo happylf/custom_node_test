@@ -2,6 +2,7 @@ import torch
 import os       
 import sys
 import json
+import math
 from GPUtil import showUtilization as gpu_usage
 
 import nodes 
@@ -71,6 +72,90 @@ class PreSampler_CN:
         pre_sampler=(model, vae, posi_cond, nega_cond, latent_image)
 
         return(pre_sampler, )
+
+class Pre_transformation:
+    @classmethod
+    def INPUT_TYPES(s):        
+        return {
+            "required": {
+                "cur_batch": ("INT", {"default": 0, "min": 0, "max": 10000}),              
+                "ckpt_name": (folder_paths.get_filename_list("checkpoints"),),
+                "posi_from": ("STRING", {"default": "", "multiline": True}),
+                "posi_to": ("STRING", {"default": "", "multiline": True}),
+                "in_nega": ("STRING", {"default": "", "multiline": True}),
+                "CN_name": (["None"]+folder_paths.get_filename_list("controlnet"),),
+                "width": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                "height": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 10000}),
+                "max_frame": ("INT", {"default": 1, "min": 1, "max": 10000}),
+            },
+            "optional": {
+                "CN_img": ("IMAGE",),
+                "IPAd_from_img": ("IMAGE",),
+                "IPAd_to_img": ("IMAGE",),
+            }
+        }
+    RETURN_TYPES=("PRESET01", "MODEL")
+    FUNCTION = "todo"
+    CATEGORY = "TestNode/TestEp02"
+
+    def todo(self,cur_batch,ckpt_name,posi_from,posi_to,in_nega,CN_name,width,height,
+             batch_size,max_frame,CN_img=None,IPAd_from_img=None, IPAd_to_img=None): 
+        # load checkpoint model
+        model, clip, vae = load_ckpt_model(ckpt_name)
+
+        # prompt encoding           
+        posi_to, nega_cond = PromptEncoding(clip, posi_to, in_nega) 
+        posi_from, nega_cond = PromptEncoding(clip, posi_from, in_nega) 
+        # ConditioningAverage
+        to_weight = cur_batch / (max_frame - 1) 
+        t = nodes.ConditioningAverage().addWeighted(posi_to, posi_from, to_weight)[0]
+
+        t_c = t[0][0]
+        t_p = t[0][1]['pooled_output']
+
+        if IPAd_from_img != None:
+            t_mask = torch.full((1, height, width), to_weight, dtype=torch.float32, device="cpu")
+            f_mask = torch.full((1, height, width), 1-to_weight, dtype=torch.float32, device="cpu")
+
+        for i in range(1, batch_size):
+            to_weight = (cur_batch + i)/ (max_frame - 1)
+            t = nodes.ConditioningAverage().addWeighted(posi_to, posi_from, to_weight)[0]
+
+            t_c = torch.cat([t_c, t[0][0]], dim=0)
+            t_p = torch.cat([t_p, t[0][1]['pooled_output']], dim=0)   
+
+            if IPAd_from_img != None:
+                t_m = torch.full((1, height, width), to_weight, dtype=torch.float32, device="cpu")
+                f_m = torch.full((1, height, width), 1-to_weight, dtype=torch.float32, device="cpu")
+
+                t_mask = torch.cat((t_mask, t_m), dim=0)
+                f_mask = torch.cat((f_mask, f_m), dim=0)
+        posi_cond = [[t_c, {"pooled_output": t_p}]]
+
+        # apply controlnet to condition           
+        if CN_name != "None":  
+            posi_cond, nega_cond = cn_apply(posi_cond, nega_cond, CN_name, CN_img)
+            '''
+            h = CN_img.shape[1]
+            w = CN_img.shape[2]
+            area_cond = nodes.ConditioningSetArea().append(posi_cond, w, h, x, y, 1.0)
+            posi_cond = nodes.ConditioningCombine().combine(posi_common, area_cond)[0]
+            '''
+        # apply IPAdapter
+        if IPAd_from_img != None:
+            IPAd_name = "ip-adapter-plus_sd15.bin"    
+            set_IPAdapter = IPAdapter_set(IPAd_from_img, IPAd_name, 2)
+            model_1 = IPAd_apply(set_IPAdapter, model, f_mask)
+            set_IPAdapter = IPAdapter_set(IPAd_to_img, IPAd_name, 2)
+            model=IPAd_apply(set_IPAdapter, model_1, t_mask)
+
+        # latent
+        latent_image = nodes.EmptyLatentImage().generate(width, height, batch_size)[0]
+
+        pre_sampler=(model, vae, posi_cond, nega_cond, latent_image)
+         
+        return pre_sampler, model
 
 class set_IPAdapter:
     @classmethod
@@ -260,3 +345,35 @@ class debug:
     def todo(self, moving_set, x): 
 
         return moving_set, x
+
+class Cond_batch:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+        "required": {
+            "cond_from": ("CONDITIONING",), 
+            "cond_to": ("CONDITIONING",), 
+            "cur_batch": ("INT", {"default": 0, "min": 0, "max": 10000}),              
+            "max_frame": ("INT", {"default": 1, "min": 1, "max": 10000}),
+            "batch_size": ("INT", {"default": 1, "min": 1, "max": 10000}),
+            }
+        }
+    
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02/etc"
+
+    def todo(self, cond_from, cond_to, cur_batch, max_frame, batch_size):
+        c = cond_from[0][0]
+        p = cond_from[0][1]['pooled_output']
+
+        for i in range(1, batch_size):
+            to_weight = (cur_batch + i)/ (max_frame - 1)
+            t = nodes.ConditioningAverage().addWeighted(cond_to, cond_from, to_weight)[0]
+
+            c = torch.cat([c, t[0][0]], dim=0)
+            p = torch.cat([p, t[0][1]['pooled_output']], dim=0)   
+        out_cond = [[c, {"pooled_output": p}]]
+
+        return (out_cond,)    

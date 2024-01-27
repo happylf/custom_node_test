@@ -3,6 +3,7 @@ from .compartment       import *
 
 NODE_CLASS_MAPPINGS = {
     "PreSampler_CN":            PreSampler_CN,
+    "Pre_transformation":       Pre_transformation,
     "set_IPAdapter":            set_IPAdapter,
     "Yolo_Detector":            Yolo_Detector,
     "Sampler01":                Sampler01,
@@ -11,11 +12,13 @@ NODE_CLASS_MAPPINGS = {
     "LoopDecision01":           LoopDecision01,
     "MovingControl":            MovingControl,
     "PersonMoving":             PersonMoving,
+    "Cond_batch":               Cond_batch,
     "debug":                    debug
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "PreSampler_CN":            "PreSampler_CN",    
+    "Pre_transformation":       "Pre_transformation",
     "set_IPAdapter":            "set_IPAdapter",
     "Yolo_Detector":            "Yolo_Detector",
     "Sampler01":                "Sampler01",
@@ -24,6 +27,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LoopDecision01":           "LoopDecision01",
     "MovingControl":            "MovingControl",    
     "PersonMoving":             "PersonMoving",
+    "Cond_batch":               "Cond_batch",
     "debug":                    "debug"
 }
 
