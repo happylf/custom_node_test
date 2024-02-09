@@ -2,6 +2,9 @@ import os
 import sys
 import math
 
+# essentials
+import ComfyUI_essentials.essentials as essentials
+
 # Reactor
 '''
 # fail---------------
@@ -18,6 +21,11 @@ custom_node_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
 Reactor_path = os.path.join(custom_node_path, "comfyui-reactor-node")
 sys.path.append(Reactor_path)
 from reactor_nodes import reactor, LoadFaceModel
+
+# 15 Puzzle
+from .Puzzle15.model import *
+from .Puzzle15.ai import *
+from PIL import Image
 
 def Reactor_apply(image):
     model_name = "Tamiya.safetensors"
@@ -85,3 +93,46 @@ def moving_calc(in_text, batch_size):
             r1 = r2 
 
     return mov_list 
+
+def puz15_init():
+    # ai
+    ai_init()
+    # aiMoveIndex = 0
+    aiMoves = []
+
+    puzzle = Puzzle()
+    print("initial state")
+    print(puzzle)
+    aiMoves = idaStar(puzzle)
+    print(aiMoves)
+
+    return puzzle, aiMoves
+
+def crop(image, width, height, x, y):
+    x = int(x)
+    y = int(y)
+    to_x = int(width + x)
+    to_y = int(height + y)
+    img = image[:,y:to_y, x:to_x, :]
+    return img
+
+def puz15_crop(image, crop_w, crop_h):
+    crop_img = []
+    for i in range(4):
+        for j in range(4):
+            x = j * crop_w
+            y = i * crop_h
+            t_img = crop(image, crop_w, crop_h, x, y)
+            crop_img.append(t_img)
+    return crop_img
+
+def drawText(text, w, h):
+    font = 'arialbd'
+    size = 80
+    color = '#000000'
+    bk_color = '#FFFFFF'
+    sd_distance = 0
+    sd_blur = 0
+    sd_color = '#000000'
+    alignment = "center"
+    return essentials.DrawText().execute(text,font,size,color,bk_color,sd_distance,sd_blur,sd_color,alignment,w,h)

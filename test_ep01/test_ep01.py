@@ -23,7 +23,7 @@ Controlnet_path  = os.path.join(custom_nodes_path, "ComfyUI-Advanced-ControlNet"
 sys.path.append(AniDiff_path )
 sys.path.append(Controlnet_path )
 import animatediff.nodes as AD_nodes
-import control.nodes as control_nodes
+import adv_control.nodes as control_nodes
 
 # IPAdapter_plus import
 import ComfyUI_IPAdapter_plus.IPAdapterPlus as IPAdapter
@@ -37,7 +37,8 @@ import gptcpp_node as N_nodes
 # Impact-pack
 Impact_path = os.path.join(custom_nodes_path, "ComfyUI-Impact-Pack\modules\impact")
 sys.path.append(Impact_path)
-import impact_pack as Impact
+# import impact_pack as Impact
+from impact_pack import DetailerForEach
 
 import comfy_extras.nodes_mask as nodes_mask
 # LCM lora
@@ -575,7 +576,7 @@ class FaceEnhance:
         force_inpaint = "enabled"
         wildcard = ""
         detailer_hook=None
-        enhanced_img = Impact.DetailerForEach().doit(input_image, segs, model, clip, vae, guide_size,
+        enhanced_img = DetailerForEach().doit(input_image, segs, model, clip, vae, guide_size,
                 guide_size_for, max_size, seed, steps, cfg, sampler_name, scheduler, positive, 
                 negative, denoise, feather, noise_mask, force_inpaint, wildcard, detailer_hook)
       

@@ -13,6 +13,7 @@ NODE_CLASS_MAPPINGS = {
     "MovingControl":            MovingControl,
     "PersonMoving":             PersonMoving,
     "Cond_batch":               Cond_batch,
+    "Puzzle15":                 Puzzle15,    
     "debug":                    debug
 }
 
@@ -28,6 +29,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MovingControl":            "MovingControl",    
     "PersonMoving":             "PersonMoving",
     "Cond_batch":               "Cond_batch",
+    "Puzzle15":                 "Puzzle15",        
     "debug":                    "debug"
 }
 

@@ -14,7 +14,7 @@ import impact_pack as impact
 
 from .common import *
 
-from animatediff.model_utils import get_available_motion_models
+from animatediff.utils_model import get_available_motion_models
 
 # IPAdapter_plus
 import ComfyUI_IPAdapter_plus.IPAdapterPlus as IPAdapter
@@ -377,3 +377,38 @@ class Cond_batch:
         out_cond = [[c, {"pooled_output": p}]]
 
         return (out_cond,)    
+    
+class Puzzle15:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),                
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02/etc"
+
+    def todo(self, image):
+        puzzle, aiMoves = puz15_init()
+
+        h = image.shape[1]
+        w = image.shape[2]
+        crop_w = w/4
+        crop_h = h/4
+        crop_img = puz15_crop(image, crop_w, crop_h)
+        mask = torch.full((1, h, w), 1, dtype=torch.float32, device="cpu")
+
+        out_img = []
+        count_down = len(aiMoves) - 1
+        for m in aiMoves:
+            puzzle.move(m)
+            t_img = puz15_draw(image, crop_img, crop_w, crop_h, mask, puzzle, count_down)
+            out_img.append(t_img)
+            count_down -= 1 
+        out_img = torch.cat(out_img, 0)    
+
+        return (out_img,)       

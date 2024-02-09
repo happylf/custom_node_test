@@ -31,7 +31,7 @@ Controlnet_path  = os.path.join(custom_nodes_path, "ComfyUI-Advanced-ControlNet"
 sys.path.append(AniDiff_path)
 sys.path.append(Controlnet_path)
 import animatediff.nodes as AD_nodes
-import control.nodes as control_nodes
+import adv_control.nodes as control_nodes
 
 # IPAdapter_plus
 import ComfyUI_IPAdapter_plus.IPAdapterPlus as IPAdapter
@@ -244,3 +244,36 @@ def mask_composite(d, s, o):
     y = 0
     out_mask = nodes_mask.MaskComposite().combine(d, s, x, y, o)[0]
     return out_mask
+
+def puz15_draw(image, crop_img, crop_w, crop_h, mask, puzzle, count_down):
+    crop_w = int(crop_w)
+    crop_h = int(crop_h)
+
+    resize_source = False
+    t_img = image
+    for i in range(4):
+        for j in range(4):
+            x = j * crop_w
+            y = i * crop_h
+
+            d = t_img
+            if puzzle.board[i][j] == 0:               
+                if count_down == 0:    
+                    s = crop_img[15]
+                else:
+                    d1 = crop_img[15]
+
+                    text = str(count_down)
+                    w = 90 
+                    h = 80
+                    s, m = drawText(text, w, h)
+
+                    x1 = int((crop_w-w)/2)
+                    y1 = int((crop_h-h)/2)
+                    s = nodes_mask.ImageCompositeMasked().composite(d1, s, x1, y1, resize_source, m)[0]
+            else:
+                s = crop_img[puzzle.board[i][j]-1]
+            
+            t_img = nodes_mask.ImageCompositeMasked().composite(d, s, x, y, resize_source, mask)[0]
+
+    return t_img 
