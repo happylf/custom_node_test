@@ -14,8 +14,16 @@ NODE_CLASS_MAPPINGS = {
     "PersonMoving":             PersonMoving,
     "Cond_batch":               Cond_batch,
     "Puzzle15":                 Puzzle15,    
-    "debug":                    debug
+    "debug":                    debug,
+    "GridImage":                GridImage,
+    "MakeCnImg":                MakeCnImg,
+    "BasicSetting":             BasicSetting,
+    "ApplyAniDiff":             ApplyAniDiff,
+    "ApplyContNet":             ApplyContNet,
+    "ApplyIPAd":                ApplyIPAd,
+    "makeTileSegs":             makeTileSegs
 }
+
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "PreSampler_CN":            "PreSampler_CN",    
@@ -30,6 +38,13 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "PersonMoving":             "PersonMoving",
     "Cond_batch":               "Cond_batch",
     "Puzzle15":                 "Puzzle15",        
-    "debug":                    "debug"
+    "debug":                    "debug",
+    "GridImage":                "GridImage",
+    "MakeCnImg":                "MakeCnImg",    
+    "BasicSetting":             "BasicSetting",
+    "ApplyAniDiff":             "ApplyAniDiff",
+    "ApplyContNet":             "ApplyContNet",
+    "ApplyIPAd":                "ApplyIPAd",
+    "makeTileSegs":             "makeTileSegs"
 }
 

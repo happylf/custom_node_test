@@ -1,5 +1,5 @@
 import os
-import model
+from .model import *
 import pickle
 from time import perf_counter_ns
 

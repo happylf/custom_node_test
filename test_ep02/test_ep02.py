@@ -10,18 +10,19 @@ import comfy.utils
 import folder_paths
 
 import impact.logics as logics
-import impact_pack as impact
+import impact.impact_pack as impact
 
 from .common import *
 
 from animatediff.utils_model import get_available_motion_models
+# from comfy.model_patcher import ModelPatcher
 
 # IPAdapter_plus
 import ComfyUI_IPAdapter_plus.IPAdapterPlus as IPAdapter
 
 MAX_RESOLUTION=8192
 
-out_image = []
+# out_image = []
 
 class PreSampler_CN:
     @classmethod
@@ -301,31 +302,40 @@ class LoopDecision01:
             }
         }
     RETURN_TYPES = ("INT", "INT", "IMAGE")
-    RETURN_NAMES = ("sum_val", "send_val", "out_img")
+    RETURN_NAMES = ("sum_val", "send_val", "out_image")
     FUNCTION = "todo"
     CATEGORY = "TestNode/TestEp02/etc"
 
     def todo(self, image, sum_val, send_val, image_limit): 
         torch.cuda.empty_cache()
         gpu_usage()
-
+        
+        '''
         global out_image
         if sum_val==0:
             out_image.clear()
-
         out_image.append(image)
-
-        img_cnt = image.size(0)
+        '''
+        
+        img_cnt = image.shape[0]
         sum_val = img_cnt + sum_val
+        '''
         if sum_val >= image_limit:
-            out_img = torch.cat(out_image, 0)
+            # out_img = torch.cat(out_image, 0)
             logics.ImpactConditionalStopIteration().doit(True)  # finish Auto-Queue
         else:
-            out_img = image
+            # out_img = image
             remain = image_limit - sum_val
             if remain < send_val:
                send_val = remain  
-    
+        '''
+        out_img = image
+
+        if sum_val < image_limit:
+            remain = image_limit - sum_val
+            if remain < send_val:
+               send_val = remain  
+            logics.ImpactQueueTrigger().doit(None, True)         
         return (sum_val, send_val, out_img)   
     
 class debug:
@@ -412,3 +422,222 @@ class Puzzle15:
         out_img = torch.cat(out_img, 0)    
 
         return (out_img,)       
+
+class GridImage:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "image": ("IMAGE",),   
+                "width": ("INT", {"default": 256, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                "height": ("INT", {"default": 256, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                "color_backg": ("STRING", {"default": "", "multiline": True}),            
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02/etc"
+
+    def todo(self, image, width, height, color_backg):
+        out_img = drawGridImage(image, width, height, color_backg)
+
+        return (out_img,)
+
+class MakeCnImg:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {  
+                "image": ("IMAGE",),  
+                "control_net": (["None", "DWPose"], {"default": "None"}), 
+                "width": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                "height": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("cnImg",)
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02/etc"
+
+    def todo(self, image, control_net, width, height):
+        image = imgResize(image, width, height)
+        match control_net:
+            case 'DWPose':
+                out_img = makeDWPose(image, width, height)
+            case 'None':
+                out_img = image
+
+        return (out_img,)   
+    
+def read_prompt_type_list(file_path):   
+    file_path = os.path.join(file_path, 'promp_list_ep02.json')
+    with open(file_path, 'r', encoding='utf-8') as file:
+        prompt_type_list = json.load(file)
+        type_list = list()     
+        for item in prompt_type_list:
+            type_list.append(item['TYPE'])
+            
+    return (prompt_type_list, type_list)        
+
+class BasicSetting:
+    def __init__(self):    
+        pass
+
+    @classmethod
+    def INPUT_TYPES(self):
+        file_path = os.path.dirname(os.path.realpath(__file__))     
+        self.prompt_type_list, type_list = read_prompt_type_list(file_path)  
+
+        return {
+            "required": {  
+                "ckpt_name": (folder_paths.get_filename_list("checkpoints"),),
+                "posi_from": ("STRING", {"default": "", "multiline": True}),
+                "posi_to": ("STRING", {"default": "None", "multiline": True}),
+                "app_text": ("STRING", {"default": "", "multiline": True}),                ""
+                "negative": ("STRING", {"default": "", "multiline": True}),
+                "prompt_type": (type_list, {"default": "NONE"}),
+                "lora_name": (["None"] + folder_paths.get_filename_list("loras"), ),
+                "strength_model": ("FLOAT", {"default": 1.0, "min": -20.0, "max": 20.0, "step": 0.01}),
+                "strength_clip": ("FLOAT", {"default": 1.0, "min": -20.0, "max": 20.0, "step": 0.01}),
+                "width": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                "height": ("INT", {"default": 512, "min": 16, "max": MAX_RESOLUTION, "step": 8}),
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 10000}),
+            }
+        }
+    
+    RETURN_TYPES = ("BASIC_PIPE", "MODEL", "CLIP", "VAE", "CONDITIONING", "CONDITIONING", "LATENT")
+    RETURN_NAMES = ("basic_pipe", "model", "clip", "vae", "positive", "negative")
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02"
+
+    def todo(self, ckpt_name, posi_from, posi_to, app_text, negative, prompt_type, lora_name, strength_model, strength_clip, width, height, batch_size):
+        # load checkpoint model
+        model, clip, vae = load_ckpt_model(ckpt_name)
+
+        # load lora
+        if lora_name != "None":
+            lora_path = folder_paths.get_full_path("loras", lora_name)
+            lora_model = comfy.utils.load_torch_file(lora_path, safe_load=True)
+            model, clip = comfy.sd.load_lora_for_models(model, clip, 
+                        lora_model, strength_model, strength_clip)
+        
+        # apply prompt type
+        for item in self.prompt_type_list:  
+            if item['TYPE'] == prompt_type:
+                posi_from="masterpiece,best quality,high resolution,"+item['POSITIVE']+posi_from+app_text
+                if posi_to != 'None':
+                    posi_to="masterpiece,best quality,high resolution,"+item['POSITIVE']+posi_to+app_text
+                negative="deformed,bad quality,bad anatomy," + item['NEGATIVE']+negative
+                break
+
+        cond_from = nodes.CLIPTextEncode().encode(clip, posi_from)[0]
+        if posi_to == 'None':
+            cond_posi = cond_from
+        else:            
+            cond_to = nodes.CLIPTextEncode().encode(clip, posi_to)[0]
+            cond_posi = condBatch(cond_from, cond_to, batch_size)
+        cond_nega = nodes.CLIPTextEncode().encode(clip, negative)[0]
+
+        latent_image = nodes.EmptyLatentImage().generate(width, height, batch_size)[0]
+        basic_pipe = model, clip, vae, cond_posi, cond_nega
+
+        return basic_pipe, model, clip, vae, cond_posi, cond_nega, latent_image
+
+class ApplyAniDiff:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {  
+                "model": ("MODEL",),
+                "motion_model": (get_available_motion_models(), {"default": 'v3_sd15_mm.ckpt'}),
+                "context_options": (['StandardUniform','StandardStatic','LoopedUniform',
+                                     'Batched [Non-AD]'], {"default": 'StandardStatic'}),
+                "context_length": ("INT", {"default": 16, "min": 1, "max": 128}),
+                "context_overlap": ("INT", {"default": 4, "min": 0, "max": 128}),
+            }
+        }
+    
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02"
+
+    def todo(self,model,motion_model,context_options,context_length,context_overlap):
+        return (ani_diff(model,motion_model,context_options,context_length,context_overlap),)
+
+class ApplyContNet:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {  
+                "posiCond": ("CONDITIONING", ),
+                "negaCond": ("CONDITIONING", ),
+                "control_net": ("CONTROL_NET", ),
+                "cnImg": ("IMAGE", ),
+            },
+            "optional": {
+                "latent_keyframe": ("LATENT_KEYFRAME", ),
+            }
+        }
+    
+    RETURN_TYPES = ("CONDITIONING","CONDITIONING",)
+    RETURN_NAMES = ("posiCond", "negaCond",)
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02"
+
+    def todo(self, posiCond, negaCond, control_net, cnImg, latent_keyframe=None):
+        return (cn_apply(posiCond, negaCond, control_net, cnImg, latent_keyframe))
+
+class ApplyIPAd:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {  
+                "model": ("MODEL",),
+                "image": ("IMAGE",),
+                "ipadapter_file": (folder_paths.get_filename_list("ipadapter"), ),
+                "setType": (['1', '2'], {"default": '1'}),
+            },
+            "optional": {
+                "attn_mask": ("MASK",),
+            }
+        }
+    
+    RETURN_TYPES = ("MODEL",)
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02"
+
+    def todo(self, model, image, ipadapter_file, setType, attn_mask=None):
+        set_IPAdapter = IPAdapter_set(image, ipadapter_file, setType)
+        return (IPAd_apply(set_IPAdapter, model, attn_mask),)
+        
+class makeTileSegs:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {  
+                "image": ("IMAGE",),
+                "scale_by": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 8.0, "step": 0.01}),
+                "bbox_size_in": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 8}),
+                "min_overlap_in": ("INT", {"default": 100, "min": 0, "max": 512, "step": 1}),
+                "bbox_size_out": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 8}),
+                "min_overlap_out": ("INT", {"default": 100, "min": 0, "max": 512, "step": 1}),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE", "SEGS", "SEGS",)
+    RETURN_NAMES = ("images", "segs_in", "segs_out",)
+    FUNCTION = "todo"
+
+    CATEGORY = "TestNode/TestEp02"
+
+    def todo(self,image,scale_by,bbox_size_in,min_overlap_in,bbox_size_out,min_overlap_out):
+        images, segs_in, segs_out = detectPerson(image,scale_by,bbox_size_in,min_overlap_in,bbox_size_out,min_overlap_out)
+        return (images, segs_in, segs_out,)

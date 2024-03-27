@@ -5,50 +5,10 @@ import math
 # essentials
 import ComfyUI_essentials.essentials as essentials
 
-# Reactor
-'''
-# fail---------------
-custom_node_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
-ComfyUI_path = "D:\ComfyUI_windows_portable-test_01\ComfyUI"
-sys.path.remove(ComfyUI_path)
-Reactor_path = os.path.join(custom_node_path, "comfyui-reactor-node")
-sys.path.insert(0, Reactor_path)
-print(sys.path)
-from nodes import reactor, LoadFaceModel
-# fail---------------
-'''
-custom_node_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
-Reactor_path = os.path.join(custom_node_path, "comfyui-reactor-node")
-sys.path.append(Reactor_path)
-from reactor_nodes import reactor, LoadFaceModel
-
 # 15 Puzzle
 from .Puzzle15.model import *
 from .Puzzle15.ai import *
 from PIL import Image
-
-def Reactor_apply(image):
-    model_name = "Tamiya.safetensors"
-    face_model = LoadFaceModel().load_model(model_name)[0]
-
-    enabled = "ON"
-    swap_model = "inswapper_128.onnx"
-    facedetection = "retinaface_resnet50"
-    face_restore_model = "GFPGANv1.4.pth"
-    face_restore_visibility = 1.0
-    codeformer_weight = 0.5
-    detect_gender_source = "no"
-    detect_gender_input = "no"
-    source_faces_index = "0"
-    input_faces_index = "0"
-    console_log_level = "1"
-    source_image=None    
-    image, _ = reactor().execute(enabled,image, swap_model, detect_gender_source,
-            detect_gender_input, source_faces_index, input_faces_index, console_log_level, 
-            face_restore_model, face_restore_visibility, codeformer_weight, facedetection,
-            source_image, face_model)
-    
-    return image
 
 def moving_calc(in_text, batch_size):
     in_text_list = [list(i.split(':')) for i in in_text.split('>')]
@@ -126,13 +86,20 @@ def puz15_crop(image, crop_w, crop_h):
             crop_img.append(t_img)
     return crop_img
 
-def drawText(text, w, h):
+def drawText(text, w, h, size, bk_color):
     font = 'arialbd'
-    size = 80
     color = '#000000'
-    bk_color = '#FFFFFF'
     sd_distance = 0
     sd_blur = 0
     sd_color = '#000000'
     alignment = "center"
     return essentials.DrawText().execute(text,font,size,color,bk_color,sd_distance,sd_blur,sd_color,alignment,w,h)
+
+def imgResize(image, w, h):
+    keep_proportion = False
+    interpolation="nearest"
+    condition="always"
+    out_img = essentials.ImageResize().execute(
+        image,w,h,keep_proportion,interpolation,condition)[0]
+
+    return out_img

@@ -1,0 +1,174 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": "majicmixRealistic_v7.safetensors",
+      "posi_from": "1girl, smile,",
+      "posi_to": "None",
+      "app_text": "white snow, park, pink tulle skirt,",
+      "negative": "",
+      "prompt_type": "NONE",
+      "lora_name": "SD1.5\\animatediff\\v3_sd15_adapter.ckpt",
+      "strength_model": 1,
+      "strength_clip": 1,
+      "width": 640,
+      "height": 384,
+      "batch_size": 32
+    },
+    "class_type": "BasicSetting",
+    "_meta": {
+      "title": "BasicSetting"
+    }
+  },
+  "2": {
+    "inputs": {
+      "seed": 162192784262763,
+      "steps": 10,
+      "cfg": 8,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": ["7", 0],
+      "positive": ["11", 0],
+      "negative": ["11", 1],
+      "latent_image": ["1", 6]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "vae-ft-mse-840000-ema-pruned.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "4": {
+    "inputs": {
+      "samples": ["2", 0],
+      "vae": ["3", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "6": {
+    "inputs": {
+      "frame_rate": 8,
+      "loop_count": 0,
+      "filename_prefix": "vapi",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "pingpong": false,
+      "save_output": true,
+      "images": ["13", 0]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine "
+    }
+  },
+  "7": {
+    "inputs": {
+      "motion_model": "v3_sd15_mm.ckpt",
+      "context_options": "StandardStatic",
+      "context_length": 16,
+      "context_overlap": 0,
+      "model": ["1", 1]
+    },
+    "class_type": "ApplyAniDiff",
+    "_meta": {
+      "title": "ApplyAniDiff"
+    }
+  },
+  "8": {
+    "inputs": {
+      "directory": "D:\\input\\02",
+      "image_load_cap": ["9", 0],
+      "skip_first_images": 417,
+      "select_every_nth": 1
+    },
+    "class_type": "VHS_LoadImagesPath",
+    "_meta": {
+      "title": "Load Images (Path) "
+    }
+  },
+  "9": {
+    "inputs": {
+      "value": ["1", 6]
+    },
+    "class_type": "ImpactLatentInfo",
+    "_meta": {
+      "title": "ImpactLatentInfo"
+    }
+  },
+  "10": {
+    "inputs": {
+      "control_net": "None",
+      "width": ["9", 2],
+      "height": ["9", 1],
+      "image": ["8", 0]
+    },
+    "class_type": "MakeCnImg",
+    "_meta": {
+      "title": "MakeCnImg"
+    }
+  },
+  "11": {
+    "inputs": {
+      "posiCond": ["1", 4],
+      "negaCond": ["1", 5],
+      "control_net": ["12", 0],
+      "cnImg": ["10", 0]
+    },
+    "class_type": "ApplyContNet",
+    "_meta": {
+      "title": "ApplyContNet"
+    }
+  },
+  "12": {
+    "inputs": {
+      "control_net_name": "control_v11p_sd15_openpose.pth"
+    },
+    "class_type": "ControlNetLoaderAdvanced",
+    "_meta": {
+      "title": "Load Advanced ControlNet Model "
+    }
+  },
+  "13": {
+    "inputs": {
+      "enabled": true,
+      "swap_model": "inswapper_128.onnx",
+      "facedetection": "retinaface_resnet50",
+      "face_restore_model": "GFPGANv1.4.pth",
+      "face_restore_visibility": 1,
+      "codeformer_weight": 0.5,
+      "detect_gender_source": "no",
+      "detect_gender_input": "no",
+      "source_faces_index": "0",
+      "input_faces_index": "0",
+      "console_log_level": 1,
+      "input_image": ["4", 0],
+      "face_model": ["14", 0]
+    },
+    "class_type": "ReActorFaceSwap",
+    "_meta": {
+      "title": "ReActor - Fast Face Swap"
+    }
+  },
+  "14": {
+    "inputs": {
+      "face_model": "Tamiya.safetensors"
+    },
+    "class_type": "ReActorLoadFaceModel",
+    "_meta": {
+      "title": "Load Face Model"
+    }
+  }
+}
