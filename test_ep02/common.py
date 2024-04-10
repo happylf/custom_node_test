@@ -248,7 +248,7 @@ def SamplerInsp(pre_sampler, seed, steps, cfg, sampler_name, scheduler, denoise)
     del pre_sampler, model, vae, positive, negative, latent_image
     return images, samples
 
-def img_scale_adjust(image, width, height):
+def imgScaleAdjust(image, width, height):
     upscale_method = "nearest-exact"
     crop = "disabled"
     image = nodes.ImageScale().upscale(image, upscale_method, width, height, crop)[0]

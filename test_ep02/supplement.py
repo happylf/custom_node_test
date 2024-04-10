@@ -99,7 +99,6 @@ def imgResize(image, w, h):
     keep_proportion = False
     interpolation="nearest"
     condition="always"
-    out_img = essentials.ImageResize().execute(
-        image,w,h,keep_proportion,interpolation,condition)[0]
+    out_img = essentials.ImageResize().execute(image,w,h,keep_proportion,interpolation,condition)[0]
 
     return out_img

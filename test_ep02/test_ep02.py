@@ -275,10 +275,10 @@ class Sampler01:
                 "pre_sampler": ("PRESET01",),   
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
-                "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step":0.1, "round": 0.01}),
+                "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.01}),
                 "sampler_name": (comfy.samplers.KSampler.SAMPLERS, ),
                 "scheduler": (comfy.samplers.KSampler.SCHEDULERS, ),
-                "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),                                                      
+                "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
             }
         }
     RETURN_TYPES = ("IMAGE", "LATENT")
@@ -510,7 +510,7 @@ class BasicSetting:
         }
     
     RETURN_TYPES = ("BASIC_PIPE", "MODEL", "CLIP", "VAE", "CONDITIONING", "CONDITIONING", "LATENT")
-    RETURN_NAMES = ("basic_pipe", "model", "clip", "vae", "positive", "negative")
+    RETURN_NAMES = ("basic_pipe", "model", "clip", "vae", "positive", "negative", "latent_image")
     FUNCTION = "todo"
 
     CATEGORY = "TestNode/TestEp02"
@@ -554,9 +554,7 @@ class ApplyAniDiff:
         return {
             "required": {  
                 "model": ("MODEL",),
-                "motion_model": (get_available_motion_models(), {"default": 'v3_sd15_mm.ckpt'}),
-                "context_options": (['StandardUniform','StandardStatic','LoopedUniform',
-                                     'Batched [Non-AD]'], {"default": 'StandardStatic'}),
+                "motion_model": (get_available_motion_models(), {"default": 'v3_sd15_mm.ckpt'}),              "context_options": (['StandardUniform','StandardStatic','LoopedUniform','Batched [Non-AD]'],{"default": 'StandardStatic'}),
                 "context_length": ("INT", {"default": 16, "min": 1, "max": 128}),
                 "context_overlap": ("INT", {"default": 4, "min": 0, "max": 128}),
             }
@@ -575,10 +573,10 @@ class ApplyContNet:
     def INPUT_TYPES(s):
         return {
             "required": {  
-                "posiCond": ("CONDITIONING", ),
-                "negaCond": ("CONDITIONING", ),
+                "posi_cond": ("CONDITIONING", ),
+                "nega_cond": ("CONDITIONING", ),
                 "control_net": ("CONTROL_NET", ),
-                "cnImg": ("IMAGE", ),
+                "contnet_img": ("IMAGE", ),
             },
             "optional": {
                 "latent_keyframe": ("LATENT_KEYFRAME", ),
@@ -591,8 +589,8 @@ class ApplyContNet:
 
     CATEGORY = "TestNode/TestEp02"
 
-    def todo(self, posiCond, negaCond, control_net, cnImg, latent_keyframe=None):
-        return (cn_apply(posiCond, negaCond, control_net, cnImg, latent_keyframe))
+    def todo(self, posi_cond, nega_cond, control_net, contnet_img, latent_keyframe=None):
+        return (contNetApply(posi_cond, nega_cond, control_net, contnet_img, latent_keyframe))
 
 class ApplyIPAd:
     @classmethod
